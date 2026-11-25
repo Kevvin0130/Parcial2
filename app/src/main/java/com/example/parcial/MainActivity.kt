@@ -1,14 +1,30 @@
-
 package com.example.parcial
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
+import com.example.parcial.presentation.screens.CreateTripScreen
+import com.example.parcial.presentation.screens.TripsScreen
+import com.example.parcial.data.datasource.InMemoryDataSource
+import com.example.parcial.data.repository.ExpenseRepositoryImpl
+import com.example.parcial.data.repository.TripRepositoryImpl
+import com.example.parcial.domain.usecase.CalculateTotalExpensesUseCase
+import com.example.parcial.domain.usecase.CreateTripUseCase
+import com.example.parcial.domain.usecase.GetCategoriesUseCase
+import com.example.parcial.domain.usecase.GetExpensesUseCase
+import com.example.parcial.domain.usecase.GetTripDetailUseCase
+import com.example.parcial.domain.usecase.GetTripsUseCase
+import com.example.parcial.domain.validation.TripValidator
+import com.example.parcial.presentation.screens.TripDetailRoute
+import com.example.parcial.presentation.viewmodel.TripDetailViewModel
+import com.example.parcial.presentation.viewmodel.TripViewModel
 import com.example.parcial.ui.theme.ParcialTheme
 
 class MainActivity : ComponentActivity() {
@@ -17,65 +33,62 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-
         setContent {
             ParcialTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize()
-                ) { innerPadding ->
+                val dataSource = remember { InMemoryDataSource() }
+                val tripRepository = remember { TripRepositoryImpl(dataSource) }
+                val expenseRepository = remember { ExpenseRepositoryImpl(dataSource) }
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
-                    ) {
-                        Text(
-                            text = "Mis viajes",
-                            style = MaterialTheme.typography.headlineLarge
-                        )
+                val getTrips = remember { GetTripsUseCase(tripRepository) }
+                val createTrip = remember {
+                    CreateTripUseCase(tripRepository, TripValidator())
+                }
+                val getExpenses = remember { GetExpensesUseCase(expenseRepository) }
+                val calculateTotal = remember { CalculateTotalExpensesUseCase() }
+                val getTripDetail = remember {
+                    GetTripDetailUseCase(tripRepository, getExpenses, calculateTotal)
+                }
 
-                        Text(
-                            text = "Bienvenido a TravelExpenses",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                val tripsViewModel = remember {
+                    TripViewModel(getTrips, createTrip)
+                }
+                val detailViewModel = remember {
+                    TripDetailViewModel(getTripDetail)
+                }
 
-                        Card(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(20.dp)
-                            ) {
-                                Text(
-                                    text = "Europa 2026",
-                                    style = MaterialTheme.typography.titleLarge
-                                )
+                val state by tripsViewModel.state.collectAsState()
+                var screen by remember { mutableStateOf("trips") }
+                var selectedTripId by remember { mutableStateOf("") }
 
-                                Text("Destino: Italia")
-                                Text("10/06/2026 - 20/06/2026")
+                LaunchedEffect(Unit) {
+                    tripsViewModel.loadTrips()
+                }
 
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Button(
-                                    onClick = {
-                                        // Próximamente: abrir detalle
-                                    }
-                                ) {
-                                    Text("Ver viaje")
-                                }
-                            }
+                when (screen) {
+                    "create" -> CreateTripScreen(
+                        state = state,
+                        onSave = tripsViewModel::saveTrip,
+                        onBack = { screen = "trips" },
+                        onCreated = {
+                            tripsViewModel.clearCreated()
+                            screen = "trips"
                         }
-
-                        Button(
-                            onClick = {
-                                // Próximamente: crear viaje
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("+ Crear viaje")
-                        }
-                    }
+                    )
+                    "detail" -> TripDetailRoute(
+                        tripId = selectedTripId,
+                        viewModel = detailViewModel,
+                        onBack = { screen = "trips" },
+                        onAddExpense = {}
+                    )
+                    else -> TripsScreen(
+                        state = state,
+                        onCreate = { screen = "create" },
+                        onTripClick = { id ->
+                            selectedTripId = id
+                            screen = "detail"
+                        },
+                        onRetry = tripsViewModel::loadTrips
+                    )
                 }
             }
         }
