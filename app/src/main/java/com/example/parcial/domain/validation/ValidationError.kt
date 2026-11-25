@@ -1,0 +1,16 @@
+package com.example.parcial.domain.validation
+
+enum class ValidationError {
+    NAME_REQUIRED,
+    DESTINATION_REQUIRED,
+    START_DATE_REQUIRED,
+    END_DATE_REQUIRED,
+    END_BEFORE_START,
+    DESCRIPTION_REQUIRED,
+    AMOUNT_REQUIRED,
+    AMOUNT_INVALID,
+    AMOUNT_NOT_POSITIVE,
+    CATEGORY_REQUIRED,
+    DATE_REQUIRED,
+    DATE_OUT_OF_TRIP_RANGE
+}
